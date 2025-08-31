@@ -1,0 +1,165 @@
+{% extends 'base.html' %}
+
+{% block title %}Type The Word Game{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="bg-white p-8 rounded-xl shadow-lg text-center">
+        <h1 class="text-2xl font-bold text-gray-800 mb-2">Type the Greek Word</h1>
+        <p class="text-gray-600 mb-6">Listen to the pronunciation and type the matching Greek word for:</p>
+
+        <div class="bg-gray-100 p-6 rounded-lg mb-6">
+            <p class="text-3xl font-semibold text-indigo-700">{{ russian_translation }}</p>
+        </div>
+
+        <button id="play-sound-btn" class="mb-6 bg-indigo-500 text-white p-3 rounded-full hover:bg-indigo-600 transition duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" aria-label="Play pronunciation">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+            </svg>
+        </button>
+
+        <form id="answer-form">
+            <input type="text" id="answer-input"
+                   lang="el"
+                   class="w-full text-center text-xl p-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                   placeholder="Type here in Greek..."
+                   autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+
+            <button id="check-btn" type="submit"
+                    class="mt-6 w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg focus:outline-none focus:shadow-outline transition duration-300 text-lg">
+                Check Answer
+            </button>
+        </form>
+
+        <div id="feedback" class="mt-4 text-xl h-8"></div>
+        <div id="hint" class="mt-2 text-2xl text-gray-800 font-mono h-12"></div>
+
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // --- Game Data (from Django) ---
+    const correctGreekWord = '{{ greek_word|escapejs }}';
+    const wordId = '{{ word_id }}';
+
+    // --- DOM Elements ---
+    const answerForm = document.getElementById('answer-form');
+    const answerInput = document.getElementById('answer-input');
+    const feedbackDiv = document.getElementById('feedback');
+    const hintDiv = document.getElementById('hint');
+    const playSoundBtn = document.getElementById('play-sound-btn');
+    const checkBtn = document.getElementById('check-btn');
+
+    // --- Game State ---
+    let isFirstAttempt = true;
+
+    // --- Audio Player for Google TTS ---
+    const audioPlayer = new Audio();
+
+    function speak(text) {
+        const encodedText = encodeURIComponent(text);
+        const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodedText}&tl=el&client=tw-ob`;
+        
+        audioPlayer.src = audioUrl;
+        audioPlayer.play().catch(e => console.error("🔴 Audio playback failed:", e));
+    }
+
+    // --- Event Listeners ---
+    playSoundBtn.addEventListener('click', () => speak(correctGreekWord));
+    answerForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        checkAnswer();
+    });
+
+    // --- Main Game Logic ---
+    function checkAnswer() {
+        const userAnswer = answerInput.value.trim();
+        if (!userAnswer) return;
+
+        const normalizedUserAnswer = userAnswer.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const normalizedCorrectWord = correctGreekWord.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+        if (normalizedUserAnswer === normalizedCorrectWord) {
+            handleCorrectAnswer();
+        } else {
+            if (isFirstAttempt) {
+                updateWordScore(false); // Penalize score only on the first mistake
+                isFirstAttempt = false; // Mark that the first attempt has been made
+            }
+            handleIncorrectAnswer();
+        }
+    }
+
+    function handleCorrectAnswer() {
+        if (isFirstAttempt) {
+            updateWordScore(true); // Reward score only if correct on the first try
+        }
+        
+        answerInput.disabled = true;
+        checkBtn.disabled = true;
+        checkBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+        checkBtn.classList.add('bg-gray-400');
+        feedbackDiv.innerHTML = `<p class="text-green-600 font-bold">🎉 Correct!</p>`;
+        hintDiv.innerHTML = '';
+        
+        setTimeout(() => {
+            location.reload(); // Load the next word
+        }, 1500);
+    }
+
+    function handleIncorrectAnswer() {
+        // Stage 1: Show the correct answer and wait for a keypress
+        feedbackDiv.innerHTML = `<p class="text-orange-600 font-bold">Press any key to try again.</p>`;
+        hintDiv.innerHTML = `<span class="bg-yellow-200 text-black px-2 py-1 rounded">${correctGreekWord}</span>`;
+        
+        answerInput.disabled = true;
+        checkBtn.disabled = true;
+        
+        speak(correctGreekWord);
+
+        document.addEventListener('keydown', hideAnswerAndPrompt, { once: true });
+    }
+
+    function hideAnswerAndPrompt() {
+        // Stage 2: Hide the answer and prompt the user to type it
+        hintDiv.innerHTML = '';
+        feedbackDiv.innerHTML = `<p class="text-indigo-600 font-bold">Now, type the word correctly to continue.</p>`;
+        
+        answerInput.disabled = false;
+        checkBtn.disabled = false;
+        answerInput.value = '';
+        answerInput.focus();
+        
+        speak(correctGreekWord);
+    }
+
+    function updateWordScore(success) {
+        fetch("{% url 'update_score' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({
+                word_id: wordId,
+                success: success
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                console.log(`✅ Score updated. New score: ${data.new_score}`);
+            } else {
+                console.error(`🔴 Failed to update score: ${data.message}`);
+            }
+        })
+        .catch(error => console.error('🔴 Error during score update:', error));
+    }
+
+    // --- Initial Load ---
+    setTimeout(() => speak(correctGreekWord), 300);
+    answerInput.focus();
+});
+</script>
+{% endblock %}

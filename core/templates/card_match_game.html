@@ -1,0 +1,417 @@
+{% extends 'base.html' %}
+
+{% block title %}Card Match Game{% endblock %}
+
+{% block content %}
+
+<style>
+/* General Layout */
+.game-body-container {
+    max-width: 1152px;
+    margin: 0 auto;
+    padding: 0.5rem 1rem;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.error-message {
+    background-color: #fee2e2;
+    border-left: 4px solid #ef4444;
+    color: #b91c1c;
+    padding: 1rem;
+    border-radius: 0.5rem;
+}
+.error-message p:first-child {
+    font-weight: bold;
+}
+
+/* Game Container */
+.game-container {
+    background-color: #ffffff;
+    padding: 1rem;
+    border-radius: 1rem;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.game-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.game-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+}
+
+.score-display {
+    font-size: 1rem;
+}
+
+.score-display span {
+    font-weight: bold;
+}
+
+#matches-count {
+    color: #4f46e5;
+}
+
+/* Game Grid */
+.game-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.card-column h3 {
+    text-align: center;
+    font-size: 1rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+.greek-title { color: #2563eb; }
+.russian-title { color: #16a34a; }
+
+.cards-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+/* Game Card */
+.game-card {
+    height: 2.5rem;
+    padding: 0.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #374151;
+    background-color: #ffffff;
+    border-radius: 0.5rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+    cursor: pointer;
+    border: 3px solid;
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out, background-color 0.2s ease-in-out;
+    word-break: break-word;
+    hyphens: auto;
+}
+
+.greek-card { border-color: #3b82f6; }
+.russian-card { border-color: #22c55e; }
+
+/* Card States */
+.game-card.selected {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 8px 16px -4px rgba(99, 102, 241, 0.4);
+    background-color: #e0e7ff;
+}
+.game-card.matched {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background-color: #d1fae5;
+    border-color: #10b981;
+}
+.game-card.matched.correct {
+    animation: correct-match 0.7s ease-in-out;
+}
+.game-card.incorrect {
+    animation: incorrect-match 0.5s ease;
+    border-color: #ef4444;
+}
+
+/* Keyframes for animations */
+@keyframes correct-match {
+    0% { transform: scale(1); box-shadow: 0 0 0px #22c55e; }
+    50% { transform: scale(1.05); box-shadow: 0 0 20px #22c55e; }
+    100% { transform: scale(1); box-shadow: 0 0 0px #22c55e; }
+}
+@keyframes incorrect-match {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-10px); }
+    40% { transform: translateX(10px); }
+    60% { transform: translateX(-10px); }
+    80% { transform: translateX(10px); }
+}
+
+/* Modal Styles */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s, visibility 0.3s;
+}
+.modal-overlay.visible {
+    opacity: 1;
+    visibility: visible;
+}
+.modal-content {
+    background-color: white;
+    padding: 2rem;
+    border-radius: 1rem;
+    box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
+    text-align: center;
+    max-width: 384px;
+    transform: scale(0.95);
+    transition: transform 0.3s ease-out;
+}
+.modal-overlay.visible .modal-content {
+    transform: scale(1);
+}
+.modal-icon-wrapper {
+    margin: 0 auto 1rem;
+    height: 5rem;
+    width: 5rem;
+    border-radius: 50%;
+    background-color: #dcfce7;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.modal-icon {
+    height: 3rem;
+    width: 3rem;
+    color: #22c55e;
+}
+.modal-title {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #1f2937;
+}
+.modal-text {
+    color: #4b5563;
+    margin-top: 0.5rem;
+    margin-bottom: 1.5rem;
+}
+.modal-button {
+    width: 100%;
+    background-color: #4f46e5;
+    color: white;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+.modal-button:hover {
+    background-color: #4338ca;
+}
+
+/* Media Queries for responsiveness */
+@media (max-width: 768px) {
+    .game-grid {
+        grid-template-columns: 1fr;
+    }
+}
+@media (max-width: 640px) {
+    .game-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .game-title {
+        margin-bottom: 0.5rem;
+    }
+}
+</style>
+
+<div class="game-body-container">
+{% if error %}
+<div class="error-message">
+<p>Error</p>
+<p>{{ error }}</p>
+</div>
+{% else %}
+<div class="game-container">
+<div class="game-header">
+<h2 class="game-title">Match the Words</h2>
+<div class="score-display">
+<span>Matches Found:</span>
+<span id="matches-count">0</span> / {{ total_pairs }}
+</div>
+</div>
+
+    <div class="game-grid">
+        <div class="card-column">
+            <h3 class="greek-title">Ελληνικά (Greek)</h3>
+            <div class="cards-wrapper">
+                {% for card in greek_cards %}
+                <div class="game-card greek-card"
+                     data-id="{{ card.id }}"
+                     data-pair-id="{{ card.pair_id }}"
+                     data-type="greek">
+                    <span>{{ card.text }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="card-column">
+            <h3 class="russian-title">Русский (Russian)</h3>
+            <div class="cards-wrapper">
+                {% for card in russian_cards %}
+                <div class="game-card russian-card"
+                     data-id="{{ card.id }}"
+                     data-pair-id="{{ card.pair_id }}"
+                     data-type="russian">
+                    <span>{{ card.text }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+</div>
+
+<div id="success-modal" class="modal-overlay">
+<div class="modal-content">
+<div class="modal-icon-wrapper">
+<svg class="modal-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+</svg>
+</div>
+<h3 class="modal-title">Congratulations!</h3>
+<p class="modal-text">You've matched all the pairs!</p>
+<button onclick="location.reload()" class="modal-button">
+Play Again
+</button>
+</div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+const matchesCountSpan = document.getElementById('matches-count');
+const successModal = document.getElementById('success-modal');
+const cards = document.querySelectorAll('.game-card');
+
+let selectedGreek = null;
+let selectedRussian = null;
+let matchedPairs = 0;
+let lockBoard = false;
+const totalPairs = parseInt("{{ total_pairs }}", 10) || 0;
+
+cards.forEach(card => card.addEventListener('click', () => selectCard(card)));
+
+function selectCard(card) {
+    if (lockBoard || card.classList.contains('matched')) return;
+
+    const cardType = card.dataset.type;
+
+    if (cardType === 'greek') {
+        if (selectedGreek) {
+            selectedGreek.classList.remove('selected');
+        }
+        selectedGreek = card;
+        selectedGreek.classList.add('selected');
+    } else if (cardType === 'russian') {
+        if (selectedRussian) {
+            selectedRussian.classList.remove('selected');
+        }
+        selectedRussian = card;
+        selectedRussian.classList.add('selected');
+    }
+
+    if (selectedGreek && selectedRussian) {
+        lockBoard = true;
+        checkForMatch();
+    }
+}
+
+function checkForMatch() {
+    const isMatch = selectedGreek.dataset.pairId === selectedRussian.dataset.pairId;
+    const wordIdToUpdate = selectedGreek.dataset.id; 
+
+    if (isMatch) {
+        handleCorrectMatch();
+        updateScore(wordIdToUpdate, true);
+    } else {
+        handleIncorrectMatch();
+        updateScore(wordIdToUpdate, false);
+    }
+}
+
+function handleCorrectMatch() {
+    selectedGreek.classList.remove('selected');
+    selectedRussian.classList.remove('selected');
+
+    selectedGreek.classList.add('matched', 'correct');
+    selectedRussian.classList.add('matched', 'correct');
+    
+    matchedPairs++;
+    matchesCountSpan.textContent = matchedPairs;
+    
+    setTimeout(() => {
+        selectedGreek.classList.remove('correct');
+        selectedRussian.classList.remove('correct');
+    }, 700);
+
+    if (matchedPairs === totalPairs && totalPairs > 0) {
+        setTimeout(() => {
+            successModal.classList.add('visible');
+        }, 800);
+    }
+    
+    resetSelection();
+}
+
+function handleIncorrectMatch() {
+    selectedGreek.classList.add('incorrect');
+    selectedRussian.classList.add('incorrect');
+
+    setTimeout(() => {
+        selectedGreek.classList.remove('selected', 'incorrect');
+        selectedRussian.classList.remove('selected', 'incorrect');
+        resetSelection();
+    }, 800);
+}
+
+function resetSelection() {
+    selectedGreek = null;
+    selectedRussian = null;
+    lockBoard = false;
+}
+
+function updateScore(wordId, success) {
+    fetch("{% url 'update_score' %}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}' // Important: Add CSRF token for Django POST requests
+        },
+        body: JSON.stringify({
+            word_id: wordId,
+            success: success
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            console.error('🔴 Network response was not ok:', response);
+            throw new Error(`Server responded with status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.status === 'success') {
+            console.log(`✅ Score updated successfully. New score: ${data.new_score}`);
+        } else {
+            console.error(`🔴 Failed to update score: ${data.message}`);
+        }
+    })
+    .catch(error => console.error('🔴 Error during fetch operation:', error));
+}
+});
+</script>
+
+{% endblock %}
