@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Type The Word Game{% endblock %}
+{% block title %}Type The Word - Daily Challenge{% endblock %}
 
 {% block content %}
 <div class="container mt-4">
@@ -8,9 +8,9 @@
         <div class="col-lg-8">
             <div class="card text-center">
                 <div class="card-body">
-                    <a href="{% url 'type_word_game_daily' %}" class="btn btn-warning mb-3">Daily Challenge</a>
-                    <h1 class="card-title">Type the Greek Word</h1>
-                    <p class="card-text text-muted">Listen to the pronunciation and type the matching Greek word for:</p>
+                    <h1 class="card-title">Type the Greek Word - Daily Challenge</h1>
+                    <p class="card-text text-muted">Answer 50 words correctly to complete the challenge.</p>
+                    <p class="h5 mb-3">Progress: <span id="progress-count">0</span> / 50</p>
 
                     <div class="bg-light p-3 rounded mb-3">
                         <p class="h2 text-primary">{{ russian_translation }}</p>
@@ -44,6 +44,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     const correctGreekWord = '{{ greek_word|escapejs }}';
     const wordId = '{{ word_id }}';
+    const progressCountSpan = document.getElementById('progress-count');
 
     const answerForm = document.getElementById('answer-form');
     const answerInput = document.getElementById('answer-input');
@@ -98,9 +99,20 @@ document.addEventListener('DOMContentLoaded', () => {
         feedbackDiv.innerHTML = `<span class="text-success">🎉 Correct!</span>`;
         hintDiv.innerHTML = '';
         
-        setTimeout(() => {
-            location.reload();
-        }, 1500);
+        let progress = parseInt(localStorage.getItem('typeWordDailyChallengeProgress') || '0');
+        progress++;
+        localStorage.setItem('typeWordDailyChallengeProgress', progress);
+        progressCountSpan.textContent = progress;
+
+        if (progress >= 50) {
+            alert("Congratulations! You have completed the daily challenge.");
+            localStorage.removeItem('typeWordDailyChallengeProgress');
+            window.location.href = "{% url 'type_word_game' %}";
+        } else {
+            setTimeout(() => {
+                location.reload();
+            }, 1500);
+        }
     }
 
     function handleIncorrectAnswer() {
@@ -147,6 +159,9 @@ document.addEventListener('DOMContentLoaded', () => {
         })
         .catch(error => console.error('Error during score update:', error));
     }
+
+    let progress = parseInt(localStorage.getItem('typeWordDailyChallengeProgress') || '0');
+    progressCountSpan.textContent = progress;
 
     setTimeout(() => speak(correctGreekWord), 300);
     answerInput.focus();
